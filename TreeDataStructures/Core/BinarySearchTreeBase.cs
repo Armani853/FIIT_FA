@@ -15,14 +15,68 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
     
     public bool IsReadOnly => false;
 
-    public ICollection<TKey> Keys => throw new NotImplementedException();
-    public ICollection<TValue> Values => throw new NotImplementedException();
+    public ICollection<TKey> Keys
+    {
+        get
+        {
+            var keys = new List<TKey>();
+            var iterator = new TreeIterator(Root, TraversalStrategy.InOrder);
+            while (iterator.MoveNext())
+            {
+                keys.Add(iterator.Current.Key);
+            } 
+            return keys;
+        }
+    }
+    public ICollection<TValue> Values
+    {
+        get
+        {
+            var values = new List<TValue>();
+            var iterator = new TreeIterator(Root, TraversalStrategy.InOrder);
+            while (iterator.MoveNext())
+            {
+                values.Add(iterator.Current.Value);
+            }
+            return values;
+        }
+    }
     
     
     public virtual void Add(TKey key, TValue value)
     {
-        throw new NotImplementedException(
-            "Implement standard BST add logic using <CreateNode(key, value)> and OnNodeAdded(newNode)");
+        TNode newnode = CreateNode(key, value);
+        if (Root == null)
+        {
+            Root = newnode;
+            Count++;
+            OnNodeAdded(newnode);
+            return;
+        }
+        TNode? current = Root;
+        TNode? parent = null;
+        int cmp = 0;
+        while (current != null)
+        {
+            parent = current;
+            cmp = Comparer.Compare(key, current.Key);
+            if (cmp == 0)
+            {
+                current.Value = value;
+                return;
+            }
+            current = cmp < 0 ? current.Left : current.Right;
+        }
+        newnode.Parent = parent;
+        if (cmp < 0)
+        {
+            parent!.Left = newnode;
+        } else
+        {
+            parent!.Right = newnode;
+        }
+        Count++;
+        OnNodeAdded(newnode);
     }
 
     
@@ -39,7 +93,35 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
     
     protected virtual void RemoveNode(TNode node)
     {
-        throw new NotImplementedException("Implement standard BST delete logic using Transplant helper");
+        TNode? parent = node.Parent;
+        TNode? child = null;
+        if (node.Left == null)
+        {
+            child = node.Right;
+            Transplant(node, node.Right);
+        } else if (node.Right == null)
+        {
+            child = node.Left;
+            Transplant(node, node.Left);
+        } else
+        {
+            TNode successor = node.Right;
+            while (successor.Left != null)
+            {
+                successor = successor.Left;
+            }
+            if (successor.Parent != node)
+            {
+                Transplant(successor, successor.Right);
+                successor.Right = node.Right;
+                successor.Right.Parent = successor;
+            }
+            Transplant(node, successor);
+            successor.Left = node.Left;
+            successor.Left.Parent = successor;
+            child = successor;
+        }
+        OnNodeRemoved(parent, child);
     }
 
     public virtual bool ContainsKey(TKey key) => FindNode(key) != null;
@@ -99,32 +181,59 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
 
     protected void RotateLeft(TNode x)
     {
-        throw new NotImplementedException();
+        if (x == null || x.Right == null)
+        {
+            return;
+        } 
+        TNode right = x.Right;
+        x.Right = right.Left;
+        if (right.Left != null)
+        {
+            right.Left.Parent = x;
+        }
+        Transplant(x, right);
+        right.Left = x;
+        x.Parent = right;
     }
 
     protected void RotateRight(TNode y)
     {
-        throw new NotImplementedException();
+        if (y == null || y.Left == null)
+        {
+            return;
+        }
+        TNode left = y.Left;
+        y.Left = left.Right;
+        if (left.Right != null)
+        {
+            left.Right.Parent = y;
+        }
+        Transplant(y, left);
+        left.Right = y;
+        y.Parent = left;
     }
     
     protected void RotateBigLeft(TNode x)
     {
-        throw new NotImplementedException();
+        RotateRight(x.Right!);
+        RotateLeft(x);
     }
     
     protected void RotateBigRight(TNode y)
     {
-        throw new NotImplementedException();
+        RotateLeft(y.Left!);
+        RotateRight(y);
     }
     
     protected void RotateDoubleLeft(TNode x)
     {
-        throw new NotImplementedException();
-    }
-    
+        RotateLeft(x);
+        RotateLeft(x);
+    }   
     protected void RotateDoubleRight(TNode y)
     {
-        throw new NotImplementedException();
+        RotateRight(y);
+        RotateRight(y);
     }
     
     protected void Transplant(TNode u, TNode? v)
@@ -145,19 +254,31 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
     }
     #endregion
     
-    public IEnumerable<TreeEntry<TKey, TValue>>  InOrder() => InOrderTraversal(Root);
-    
-    private IEnumerable<TreeEntry<TKey, TValue>>  InOrderTraversal(TNode? node)
+    public IEnumerable<TreeEntry<TKey, TValue>>  InOrder()
     {
-        if (node == null) {  yield break; }
-        throw new NotImplementedException();
+        return new TreeIterator(Root, TraversalStrategy.InOrder);
     }
     
-    public IEnumerable<TreeEntry<TKey, TValue>>  PreOrder() => throw new NotImplementedException();
-    public IEnumerable<TreeEntry<TKey, TValue>>  PostOrder() => throw new NotImplementedException();
-    public IEnumerable<TreeEntry<TKey, TValue>>  InOrderReverse() => throw new NotImplementedException();
-    public IEnumerable<TreeEntry<TKey, TValue>>  PreOrderReverse() => throw new NotImplementedException();
-    public IEnumerable<TreeEntry<TKey, TValue>>  PostOrderReverse() => throw new NotImplementedException();
+    public IEnumerable<TreeEntry<TKey, TValue>>  PreOrder()
+    {
+        return new TreeIterator(Root, TraversalStrategy.PreOrder);
+    }
+    public IEnumerable<TreeEntry<TKey, TValue>>  PostOrder()
+    {
+        return new TreeIterator(Root, TraversalStrategy.PostOrder);
+    }
+    public IEnumerable<TreeEntry<TKey, TValue>>  InOrderReverse()
+    {
+        return new TreeIterator(Root, TraversalStrategy.InOrderReverse);
+    }
+    public IEnumerable<TreeEntry<TKey, TValue>>  PreOrderReverse()
+    {
+        return new TreeIterator(Root, TraversalStrategy.PreOrderReverse);
+    }
+    public IEnumerable<TreeEntry<TKey, TValue>>  PostOrderReverse()
+    {
+        return new TreeIterator(Root, TraversalStrategy.PostOrderReverse);
+    }
     
     /// <summary>
     /// Внутренний класс-итератор. 
@@ -168,27 +289,139 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
         IEnumerator<TreeEntry<TKey, TValue>>
     {
         // probably add something here
+        private readonly TNode? _root;
         private readonly TraversalStrategy _strategy; // or make it template parameter?
-        
+        private Stack<(TNode? Node, bool Visited)> _stack;
+        private TNode? _currentNode;
+
+        public TreeIterator(TNode? root, TraversalStrategy strategy)
+        {
+            _root = root;
+            _strategy = strategy;
+            _stack = new Stack<(TNode?, bool)>();
+            _currentNode = null;
+            Reset();
+        }
+
         public IEnumerator<TreeEntry<TKey, TValue>> GetEnumerator() => this;
         IEnumerator IEnumerable.GetEnumerator() => this;
         
-        public TreeEntry<TKey, TValue> Current => throw new NotImplementedException();
+        public TreeEntry<TKey, TValue> Current {
+            get
+            {
+                if (_currentNode == null)
+                {
+                    throw new InvalidOperationException();
+                }
+                return new TreeEntry<TKey, TValue>(_currentNode.Key, _currentNode.Value, Height(_currentNode));
+            }
+        }
         object IEnumerator.Current => Current;
         
         
         public bool MoveNext()
         {
-            if (_strategy == TraversalStrategy.InOrder)
+            while (_stack.Count > 0)
             {
-                throw new NotImplementedException();
+                var (node, visited) = _stack.Pop();
+                if (node == null)
+                {
+                    continue;
+                }
+
+                switch (_strategy)
+                {
+                    case TraversalStrategy.PreOrder:
+                        if (!visited)
+                        {
+                            _stack.Push((node.Right!, false));
+                            _stack.Push((node.Left!, false));
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                    case TraversalStrategy.InOrder:
+                        if (!visited)
+                        {
+                            _stack.Push((node.Right!, false));
+                            _stack.Push((node, true));
+                            _stack.Push((node.Left!, false));
+                        } else
+                        {
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                    case TraversalStrategy.PostOrder:
+                        if (!visited)
+                        {
+                            _stack.Push((node, true));
+                            _stack.Push((node.Right!, false));
+                            _stack.Push((node.Left!, false));
+                        } else
+                        {
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                    case TraversalStrategy.PreOrderReverse:
+                        if (!visited)
+                        {
+                            _stack.Push((node, true));
+                            _stack.Push((node.Left!, false));
+                            _stack.Push((node.Right!, false));
+                        } else
+                        {
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                    case TraversalStrategy.InOrderReverse:
+                        if (!visited)
+                        {
+                            _stack.Push((node.Left!, false));
+                            _stack.Push((node, true));
+                            _stack.Push((node.Right!, false));
+                        } else
+                        {
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                    case TraversalStrategy.PostOrderReverse:
+                        if (!visited)
+                        {
+                            _stack.Push((node.Left!, false));
+                            _stack.Push((node.Right!, false));
+                            _currentNode = node;
+                            return true;
+                        }
+                        break;
+                }
             }
-            throw new NotImplementedException("Strategy not implemented");
+            _currentNode = null;
+            return false;
         }
         
         public void Reset()
         {
-            throw new NotImplementedException();
+            _stack.Clear();
+            _currentNode = null;
+            if (_root == null)
+            {
+              return;  
+            }
+            switch (_strategy)
+            {
+                case TraversalStrategy.PreOrder:
+                case TraversalStrategy.InOrder:
+                case TraversalStrategy.PostOrder:
+                case TraversalStrategy.PreOrderReverse:
+                case TraversalStrategy.InOrderReverse:
+                case TraversalStrategy.PostOrderReverse:
+                    _stack.Push((_root, false));
+                    break;
+            }
         }
 
         
@@ -196,22 +429,87 @@ public abstract class BinarySearchTreeBase<TKey, TValue, TNode>(IComparer<TKey>?
         {
             // TODO release managed resources here
         }
+
+        public int Height(TNode node)
+        {
+            return 0;
+        }
     }
-    
+
     
     private enum TraversalStrategy { InOrder, PreOrder, PostOrder, InOrderReverse, PreOrderReverse, PostOrderReverse }
     
     public IEnumerator<KeyValuePair<TKey, TValue>> GetEnumerator()
     {
-        throw new NotImplementedException();
+        return new EnumeratorWrapper(Root);
     }
     
     IEnumerator IEnumerable.GetEnumerator() => GetEnumerator();
+
+    private class EnumeratorWrapper : IEnumerator<KeyValuePair<TKey, TValue>>
+    {
+        private TreeIterator _iterator;
+
+        public EnumeratorWrapper(TNode? root)
+        {
+            _iterator = new TreeIterator(root, TraversalStrategy.InOrder);
+        }
+        public KeyValuePair<TKey, TValue> Current
+        {
+            get
+            {
+                var entry = _iterator.Current;
+                return new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
+            }
+        }
+        object IEnumerator.Current
+        {
+            get
+            {
+                return this.Current;
+            }
+        }
+        public bool MoveNext()
+        {
+            return _iterator.MoveNext();
+        }
+
+        public void Reset()
+        {
+            _iterator.Reset();
+        }
+
+        public void Dispose()
+        {
+            _iterator.Dispose();
+        }
+    }
 
 
     public void Add(KeyValuePair<TKey, TValue> item) => Add(item.Key, item.Value);
     public void Clear() { Root = null; Count = 0; }
     public bool Contains(KeyValuePair<TKey, TValue> item) => ContainsKey(item.Key);
-    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex) => throw new NotImplementedException();
+    public void CopyTo(KeyValuePair<TKey, TValue>[] array, int arrayIndex)
+    {
+        if (array == null)
+        {
+            throw new ArgumentNullException(nameof(array));
+        }
+        if (arrayIndex < 0)
+        {
+            throw new ArgumentOutOfRangeException(nameof(arrayIndex));
+        }
+        if (array.Length - arrayIndex < Count)
+        {
+            throw new ArgumentException("Insufficient Space");
+        }
+        int i = arrayIndex;
+        var iterator = new TreeIterator(Root, TraversalStrategy.InOrder);
+        while (iterator.MoveNext())
+        {
+            var entry = iterator.Current;
+            array[i++] = new KeyValuePair<TKey, TValue>(entry.Key, entry.Value);
+        }
+    }
     public bool Remove(KeyValuePair<TKey, TValue> item) => Remove(item.Key);
 }
